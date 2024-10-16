@@ -28,6 +28,7 @@ class UserRead(BaseModel):
 
 class MessageCreate(BaseModel):
     content: str
+    conversation_id: int
 
 class MessageRead(BaseModel):
     id: int
