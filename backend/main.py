@@ -7,6 +7,7 @@ from db_engine import engine
 from models import User, Message, Conversation
 from seed import seed_user_if_needed
 import random
+from typing import List, Optional
 
 seed_user_if_needed()
 
@@ -39,6 +40,11 @@ class ConversationRead(BaseModel):
     messages: list[MessageRead]
     user_id: int
 
+class ConversationListItem(BaseModel):
+    id: int
+    user_id: int
+    last_message: Optional[MessageRead]
+
 async def get_db():
     async with AsyncSession(engine) as session:
         yield session
@@ -52,6 +58,52 @@ async def get_my_user(db: AsyncSession = Depends(get_db)):
         if user is None:
             raise HTTPException(status_code=404, detail="User not found")
         return UserRead(id=user.id, name=user.name)
+    
+@app.get("/conversations", response_model=List[ConversationListItem])
+async def get_all_conversations(db: AsyncSession = Depends(get_db)):
+    async with db.begin():
+        # Get the current user (assuming there's only one user for simplicity)
+        user_result = await db.execute(select(User))
+        user = user_result.scalars().first()
+
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Get all conversations for the user
+        conversations_result = await db.execute(
+            select(Conversation).where(Conversation.user_id == user.id)
+        )
+        conversations = conversations_result.scalars().all()
+
+        conversation_list = []
+        for conversation in conversations:
+            # Get the last message for each conversation
+            last_message_result = await db.execute(
+                select(Message)
+                .where(Message.conversation_id == conversation.id)
+                .order_by(Message.timestamp.desc())
+                .limit(1)
+            )
+            last_message = last_message_result.scalars().first()
+
+            last_message_read = None
+            if last_message:
+                last_message_read = MessageRead(
+                    id=last_message.id,
+                    content=last_message.content,
+                    is_user=last_message.is_user,
+                    timestamp=last_message.timestamp.isoformat()
+                )
+
+            conversation_list.append(
+                ConversationListItem(
+                    id=conversation.id,
+                    user_id=user.id,
+                    last_message=last_message_read
+                )
+            )
+
+        return conversation_list
 
 @app.get("/conversations/{conversation_id}")
 async def get_conversations(conversation_id: int, db: AsyncSession = Depends(get_db)):
@@ -100,7 +152,7 @@ async def create_conversation(db: AsyncSession = Depends(get_db)):
             is_user=False,
             conversation_id=new_conversation.id
         )
-        
+
         db.add(initial_message)
         await db.flush()
 
