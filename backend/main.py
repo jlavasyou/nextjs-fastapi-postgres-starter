@@ -222,10 +222,16 @@ async def get_messages(conversation_id: int, db: AsyncSession = Depends(get_db))
 
 def generate_bot_response() -> str:
     responses = [
-        "That's interesting! Tell me more.",
-        "I see. How does that make you feel?",
-        "Could you elaborate on that?",
-        "Interesting perspective. What led you to think that way?",
-        "I understand. Is there anything else on your mind?",
+        "Meow.",
+        "Mrow?",
+        "Purrrrrr...",
+        "Meow meow meow!",
+        "Mrrp?",
+        "*silent stare*",
+        "Hiss!",
+        "Prrrrup?",
+        "Yowl!",
+        "Mew.",
+        "*chirp*",
     ]
     return random.choice(responses)
