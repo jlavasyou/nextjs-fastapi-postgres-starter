@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from db_engine import engine
-from models import User, Message
+from models import User, Message, Conversation
 from seed import seed_user_if_needed
 import random
 
@@ -15,7 +15,7 @@ app = FastAPI()
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Adjust this to specify allowed origins
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -34,6 +34,11 @@ class MessageRead(BaseModel):
     is_user: bool
     timestamp: str
 
+class ConversationRead(BaseModel):
+    id: int
+    messages: list[MessageRead]
+    user_id: int
+
 async def get_db():
     async with AsyncSession(engine) as session:
         yield session
@@ -48,8 +53,36 @@ async def get_my_user(db: AsyncSession = Depends(get_db)):
             raise HTTPException(status_code=404, detail="User not found")
         return UserRead(id=user.id, name=user.name)
 
-@app.post("/messages")
-async def create_message(message: MessageCreate, db: AsyncSession = Depends(get_db)):
+@app.get("/conversations/{conversation_id}")
+async def get_conversations(conversation_id: int, db: AsyncSession = Depends(get_db)):
+    async with db.begin():
+        result = await db.execute(select(Conversation).where(Conversation.id == conversation_id))
+        conversation = result.scalars().first()
+
+        if conversation is None:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        
+        result = await db.execute(select(Message).where(Message.conversation_id == conversation_id).order_by(Message.timestamp))
+        messages = result.scalars().all()
+
+        message_reads = [
+            MessageRead(
+                id=message.id,
+                content=message.content,
+                is_user=message.is_user,
+                timestamp=message.timestamp.isoformat()
+            )
+            for message in messages
+        ]
+
+        return ConversationRead(
+            user_id=conversation.user_id,
+            id=conversation_id,
+            messages=message_reads
+        )
+
+@app.post("/conversations")
+async def create_conversation(db: AsyncSession = Depends(get_db)):
     async with db.begin():
         user = await db.execute(select(User))
         user = user.scalars().first()
@@ -57,13 +90,57 @@ async def create_message(message: MessageCreate, db: AsyncSession = Depends(get_
         if user is None:
             raise HTTPException(status_code=404, detail="User not found")
 
-        new_message = Message(content=message.content, is_user=True, user_id=user.id)
+        new_conversation = Conversation(user_id=user.id)
+        db.add(new_conversation)
+        await db.flush()
+
+        # Seed the conversation with an initial message
+        initial_message = Message(
+            content="Welcome to the conversation!",
+            is_user=False,
+            conversation_id=new_conversation.id
+        )
+        
+        db.add(initial_message)
+        await db.flush()
+
+        return ConversationRead(
+            id=new_conversation.id,
+            user_id=user.id,
+            messages=[
+                MessageRead(
+                    id=initial_message.id,
+                    content=initial_message.content,
+                    is_user=initial_message.is_user,
+                    timestamp=initial_message.timestamp.isoformat()
+                )
+            ]
+        )
+
+@app.post("/messages")
+async def create_message(message: MessageCreate, db: AsyncSession = Depends(get_db)):
+    async with db.begin():
+        result = await db.execute(select(Conversation).where(Conversation.id == message.conversation_id))
+        conversation = result.scalars().first()
+
+        if conversation is None:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+
+        new_message = Message(
+            content=message.content,
+            is_user=True,
+            conversation_id=message.conversation_id
+        )
         db.add(new_message)
         await db.flush()
 
         # Generate bot response
         bot_response = generate_bot_response()
-        bot_message = Message(content=bot_response, is_user=False, user_id=user.id)
+        bot_message = Message(
+            content=bot_response,
+            is_user=False,
+            conversation_id=message.conversation_id
+        )
         db.add(bot_message)
         await db.flush()
 
@@ -75,9 +152,9 @@ async def create_message(message: MessageCreate, db: AsyncSession = Depends(get_
         )
 
 @app.get("/messages")
-async def get_messages(db: AsyncSession = Depends(get_db)):
+async def get_messages(conversation_id: int, db: AsyncSession = Depends(get_db)):
     async with db.begin():
-        result = await db.execute(select(Message).order_by(Message.timestamp))
+        result = await db.execute(select(Message).where(Message.conversation_id == conversation_id).order_by(Message.timestamp))
         messages = result.scalars().all()
 
         return [
