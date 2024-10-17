@@ -1,5 +1,7 @@
 ## Running the Application
 
+Simple Catbot is a fun and interactive chat application that allows users to have multiple conversations with a cat-themed chatbot. The application is built using a modern tech stack and incorporates several design patterns for efficient and maintainable code.
+
 ## Required Software
 
 1. Python
