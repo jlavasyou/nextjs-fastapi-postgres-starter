@@ -149,7 +149,7 @@ async def create_conversation(db: AsyncSession = Depends(get_db)):
 
         # Seed the conversation with an initial message
         initial_message = Message(
-            content="Welcome to the conversation!",
+            content="Meow... Meow? Meow!",
             is_user=False,
             conversation_id=new_conversation.id
         )
@@ -170,15 +170,10 @@ async def create_conversation(db: AsyncSession = Depends(get_db)):
             ]
         )
 
-@app.post("/messages")
+@app.post("/messages", response_model=List[MessageRead])
 async def create_message(message: MessageCreate, db: AsyncSession = Depends(get_db)):
     async with db.begin():
-        result = await db.execute(select(Conversation).where(Conversation.id == message.conversation_id))
-        conversation = result.scalars().first()
-
-        if conversation is None:
-            raise HTTPException(status_code=404, detail="Conversation not found")
-
+        # Create user message
         new_message = Message(
             content=message.content,
             is_user=True,
@@ -197,12 +192,21 @@ async def create_message(message: MessageCreate, db: AsyncSession = Depends(get_
         db.add(bot_message)
         await db.flush()
 
-        return MessageRead(
-            id=bot_message.id,
-            content=bot_message.content,
-            is_user=bot_message.is_user,
-            timestamp=bot_message.timestamp.isoformat()
-        )
+        # Return both messages
+        return [
+            MessageRead(
+                id=new_message.id,
+                content=new_message.content,
+                is_user=new_message.is_user,
+                timestamp=new_message.timestamp.isoformat()
+            ),
+            MessageRead(
+                id=bot_message.id,
+                content=bot_message.content,
+                is_user=bot_message.is_user,
+                timestamp=bot_message.timestamp.isoformat()
+            )
+        ]
 
 @app.get("/messages")
 async def get_messages(conversation_id: int, db: AsyncSession = Depends(get_db)):

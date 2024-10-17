@@ -78,25 +78,21 @@ export default function ChatInterface({ initialUser }: { initialUser: User }) {
   }
 
   const handleSendMessage = async (content: string) => {
-    if (!selectedConversation) return
-
     try {
       const response = await fetch(`${apiUrl}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content, conversation_id: selectedConversation.id }),
-      })
-      if (!response.ok) throw new Error('Failed to send message')
-      const newMessage = await response.json()
-      setMessages([...messages, newMessage])
-      // Update the last message in the conversation list
-      setConversations(conversations.map(conv =>
-        conv.id === selectedConversation.id ? { ...conv, last_message: newMessage } : conv
-      ))
+        body: JSON.stringify({ content, conversation_id: selectedConversation?.id }),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to send message');
+      }
+      const newMessages: Message[] = await response.json();
+      setMessages(prevMessages => [...prevMessages, ...newMessages]);
     } catch (error) {
-      console.error('Error sending message:', error)
+      console.error('Error sending message:', error);
     }
-  }
+  };
 
   return (
     <div className="chat-container">

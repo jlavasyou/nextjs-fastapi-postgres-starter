@@ -18,3 +18,25 @@
 1. From the root directory, run `docker compose up`.
 2. In a separate terminal, `cd` into `backend` and run `poetry run uvicorn main:app --reload`.
 3. In a separate terminal, `cd` into `frontend` and run `npm run dev`.
+
+### Curl Requests for Testing
+#### Create a conversation
+```bash
+curl -X POST http://127.0.0.1:8000/conversations -H "Content-Type: application/json"
+```
+#### Get a conversation
+```bash
+curl -X GET http://127.0.0.1:8000/conversations/1
+```
+
+#### Get all conversations
+```bash
+curl -X GET http://127.0.0.1:8000/conversations
+```
+
+#### Create a message for a conversation
+```bash
+curl -X POST http://127.0.0.1:8000/messages \
+     -H "Content-Type: application/json" \
+     -d '{"content": "Hello, this is a test message", "conversation_id": 1}'
+```

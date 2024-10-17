@@ -9,7 +9,6 @@ def seed_user_if_needed():
         with session.begin():
             user = session.execute(select(User))
             if user is not None:
-                print(user)
                 print("User already exists, skipping seeding")
                 return
             print("Seeding user")
