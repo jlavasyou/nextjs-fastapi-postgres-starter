@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import ConversationList from './ConversationList'
 import MessageList from './MessageList'
 import MessageInput from './MessageInput'
+import VoiceChatButton from './VoiceChatButton';
 
 interface User {
   id: number
@@ -111,6 +112,7 @@ export default function ChatInterface({ initialUser }: { initialUser: User }) {
           <MessageInput onSendMessage={handleSendMessage} disabled={!selectedConversation} />
         </div>
       </div>
+      <VoiceChatButton />
     </div>
   )
 }
